@@ -1,0 +1,37 @@
+name: APK derle
+on:
+  push:
+    branches: [main]
+    paths: ['android/**', '.github/workflows/apk.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Adres ve yedek sayfa
+        run: |
+          OWNER=$(echo "${{ github.repository_owner }}" | tr 'A-Z' 'a-z')
+          echo "APP_URL=https://$OWNER.github.io/${{ github.event.repository.name }}/" >> "$GITHUB_ENV"
+          mkdir -p android/app/src/main/assets
+          cp web/index.html android/app/src/main/assets/index.html
+      - name: Derle
+        working-directory: android
+        run: gradle assembleRelease -PappUrl="$APP_URL" -Pvc=${{ github.run_number }} --no-daemon --stacktrace
+      - run: cp android/app/build/outputs/apk/release/app-release.apk soru-havuzu.apk
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk
+          name: Soru Havuzu (Android)
+          body: "Telefona kurmak için soru-havuzu.apk dosyasını indirin. Sorular uygulama açıldığında kendiliğinden güncellenir; APK'yı yeniden kurmak gerekmez."
+          files: soru-havuzu.apk
+          make_latest: true

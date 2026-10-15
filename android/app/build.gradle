@@ -1,0 +1,34 @@
+plugins { id 'com.android.application' }
+
+def appUrl = project.findProperty('appUrl') ?: 'https://example.github.io/soru-havuzu/'
+def vc = (project.findProperty('vc') ?: '1') as Integer
+
+android {
+  namespace 'com.haan.soruhavuzu'
+  compileSdk 34
+  defaultConfig {
+    applicationId "com.haan.soruhavuzu"
+    minSdk 24
+    targetSdk 34
+    versionCode vc
+    versionName "1.${vc}"
+    buildConfigField "String", "APP_URL", "\"${appUrl}\""
+  }
+  buildFeatures { buildConfig true }
+  signingConfigs {
+    release {
+      storeFile file('../keystore/soruhavuzu.p12')
+      storeType 'pkcs12'
+      storePassword 'soruhavuzu'
+      keyAlias 'soruhavuzu'
+      keyPassword 'soruhavuzu'
+    }
+  }
+  buildTypes {
+    release { minifyEnabled false; signingConfig signingConfigs.release }
+  }
+  compileOptions {
+    sourceCompatibility JavaVersion.VERSION_17
+    targetCompatibility JavaVersion.VERSION_17
+  }
+}
