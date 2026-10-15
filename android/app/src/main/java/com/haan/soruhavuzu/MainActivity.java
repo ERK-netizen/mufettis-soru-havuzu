@@ -38,6 +38,15 @@ public class MainActivity extends Activity {
         return true;
       }
 
+      @SuppressWarnings("deprecation")
+      @Override
+      public void onReceivedError(WebView v, int code, String desc, String url) {
+        if (!fallback && url != null && url.startsWith(BuildConfig.APP_URL)) {
+          fallback = true;
+          v.loadUrl("file:///android_asset/index.html");
+        }
+      }
+
       @Override
       public void onReceivedError(WebView v, WebResourceRequest r, WebResourceError e) {
         if (r.isForMainFrame() && !fallback) {

@@ -1,17 +1,17 @@
 plugins { id 'com.android.application' }
 
 def appUrl = project.findProperty('appUrl') ?: 'https://example.github.io/soru-havuzu/'
-def vc = (project.findProperty('vc') ?: '1') as Integer
+def vc = 100 + ((project.findProperty('vc') ?: '1') as Integer)
 
 android {
   namespace 'com.haan.soruhavuzu'
   compileSdk 34
   defaultConfig {
     applicationId "com.haan.soruhavuzu"
-    minSdk 24
+    minSdk 21
     targetSdk 34
     versionCode vc
-    versionName "1.${vc}"
+    versionName "1.${vc - 100}"
     buildConfigField "String", "APP_URL", "\"${appUrl}\""
   }
   buildFeatures { buildConfig true }
@@ -22,6 +22,9 @@ android {
       storePassword 'soruhavuzu'
       keyAlias 'soruhavuzu'
       keyPassword 'soruhavuzu'
+      enableV1Signing true
+      enableV2Signing true
+      enableV3Signing true
     }
   }
   buildTypes {
