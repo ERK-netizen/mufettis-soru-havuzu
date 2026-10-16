@@ -1,7 +1,7 @@
 /* ================= uygulama ================= */
 (function(){
 "use strict";
-var SECS=["a","b","c","d"], LET=["A","B","C","D"];
+var SECS=["a","b","c","d"], LET=["A","B","C","D","E"];
 var SEC_SHORT={a:"a) Genel",b:"b) MEB",c:"c) Mali-Adli",d:"ç) Diğer"};
 var LS_KEY="mufyrd_app_v3", LS_SES="mufyrd_ses_v3", LS_OLD="mufyrd_havuz_v2";
 
@@ -121,7 +121,7 @@ function startSession(kind,title,list,opts){
   if(!list.length)return;
   var ids=list.map(function(x){return x.id;});
   if(opts.shuffle)ids=shuffle(ids);
-  var orders={};ids.forEach(function(id){orders[id]=shuffle([0,1,2,3]);});
+  var orders={};list.forEach(function(x){orders[x.id]=shuffle(x.o.map(function(_,i){return i;}));});
   SES={kind:kind,title:title,ids:ids,i:0,picks:{},orders:orders,start:now(),done:false};
   saveSes();route.tab=kind==="exam"?"exam":(kind==="review"?"review":"study");route.screen="play";askState={};refresh();view.scrollTop=0;
 }
@@ -405,7 +405,7 @@ function downloadCopy(){
 }
 document.addEventListener("keydown",function(e){
   if(route.screen!=="play"||e.target.tagName==="INPUT")return;
-  var k=e.key.toUpperCase(),i=LET.indexOf(k);if(i<0&&"1234".indexOf(e.key)>=0&&e.key.length===1)i=+e.key-1;
+  var k=e.key.toUpperCase(),i=LET.indexOf(k);if(i<0&&"12345".indexOf(e.key)>=0&&e.key.length===1)i=+e.key-1;
   var x=curQ();if(i>=0&&x){answer(SES.orders[x.id][i]);}
   else if(e.key==="ArrowRight")move(1);else if(e.key==="ArrowLeft")move(-1);
 });
