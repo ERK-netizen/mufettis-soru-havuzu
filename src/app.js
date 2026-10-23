@@ -206,7 +206,7 @@ function startSession(kind,title,list,opts){
   if(!list.length)return;
   var ids=list.map(function(x){return x.id;});
   if(opts.shuffle)ids=shuffle(ids);
-  var orders={};list.forEach(function(x){orders[x.id]=shuffle(x.o.map(function(_,i){return i;}));});
+  var orders={};list.forEach(function(x){var ix=x.o.map(function(_,i){return i;});orders[x.id]=x.f?ix:shuffle(ix);});
   SES={kind:kind,title:title,ids:ids,i:0,picks:{},orders:orders,start:now(),done:false};
   saveSes();route.tab=kind==="exam"?"exam":(kind==="review"?"review":"study");route.screen="play";askState={};refresh();view.scrollTop=0;
 }
@@ -250,6 +250,16 @@ function renderStudy(){
 
 /* --- Soru ekranı --- */
 function curQ(){return SES?BYID[SES.ids[SES.i]]:null;}
+/* seçenek gerekçeleri (w alanı: o ile aynı sırada; w[a] boş) */
+function whyList(x,ord,pick){
+  if(!x.w)return "";
+  var h="<div class=\"whys\"><span class=\"wt\">Seçeneklerin değerlendirmesi</span><ul>";
+  ord.forEach(function(oi,pos){
+    var r=oi===x.a;
+    h+="<li class=\""+(r?"ok":(oi===pick?"no pk":"no"))+"\"><b>"+LET[pos]+")</b> "+(r?"<em>Doğru.</em> Gerekçe yukarıda.":esc(x.w[oi]||""))+"</li>";
+  });
+  return h+"</ul></div>";
+}
 function renderPlay(){
   if(!SES){route.screen="home";return renderStudy();}
   var x=curQ(),exam=SES.kind==="exam",pick=SES.picks[x.id],ord=SES.orders[x.id],reveal=!exam&&pick!=null;
@@ -270,6 +280,7 @@ function renderPlay(){
   if(reveal){
     var ok=pick===x.a,s=SRC[x.s];
     h+="<div class=\"explain\"><div class=\"verdict "+(ok?"ok":"no")+"\">"+(ok?"Doğru.":"Yanlış. Doğru cevap "+LET[ord.indexOf(x.a)]+".")+"</div><p>"+esc(x.e)+"</p>"
+      +whyList(x,ord,pick)
       +"<div class=\"ref\"><span class=\"madde\">"+esc(x.d)+"</span><span class=\"vb "+s.v+"\">"+VLAB[s.v]+"</span></div>"
       +"<div class=\"src\">Kaynak: "+(s.u?"<a href=\""+esc(s.u)+"\" target=\"_blank\" rel=\"noopener\">"+esc(s.t)+"</a>":esc(s.t))+"</div>";
     if(!ok&&ozHas(x))h+="<details class=\"ozet\" open><summary>"+ozTitle(x)+"</summary>"+ozBody(x)+"</details>";
@@ -498,7 +509,7 @@ function askClaude(){
   var prompt="Sen MEB Müfettiş Yardımcılığı sınavına hazırlanan bir adaya mevzuat öğreten bir eğitmensin. Aşağıdaki çoktan seçmeli soruyu Türkçe, en fazla 150 kelimeyle açıkla.\n"
     +"Kurallar: Doğru cevabın neden doğru olduğunu ve adayın seçtiği yanlış seçeneğin (varsa) neden yanlış olduğunu açıkla. Yalnızca aşağıda verilen dayanak madde ve açıklamaya dayan; madde numarası, süre, oran veya tutar uydurma. Emin olmadığın bir ayrıntıyı söyleme. Sonuna hatırlamayı kolaylaştıran tek cümlelik bir ipucu ekle. Başlık veya madde imi kullanma.\n\n"
     +"Konu: "+x.k+"\nSoru: "+x.q.replace(/<br>/g," ")+"\nSeçenekler:\n"+x.o.map(function(o,i){return "- "+o+(i===x.a?" (doğru cevap)":"")+(i===pick&&i!==x.a?" (adayın seçtiği)":"");}).join("\n")
-    +"\nDayanak: "+x.d+"\nHavuzdaki açıklama: "+x.e;
+    +"\nDayanak: "+x.d+"\nHavuzdaki açıklama: "+x.e+(x.w?"\nYanlış seçeneklerin gerekçeleri: "+x.o.map(function(o,i){return i===x.a?"":"\n- "+o+": "+x.w[i];}).join(""):"");
   SAMPLE(prompt,{onText:function(u){st.text=u.text;var el=document.getElementById("askText");if(el&&curQ()===x&&el.parentNode.className==="askbox")el.textContent=u.text;else if(curQ()===x)refresh();}})
     .then(function(r){st.busy=false;st.text=r.text;if(curQ()===x)refresh();},
       function(e){st.busy=false;if(e&&e.text)st.text=e.text;

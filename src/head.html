@@ -131,6 +131,9 @@ button:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(
 .verdict{font-weight:600}
 .verdict.ok{color:var(--ok)} .verdict.no{color:var(--bad)}
 .ref{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.whys{display:grid;gap:6px}.whys .wt{font-weight:600;font-size:.82rem;letter-spacing:.04em;text-transform:uppercase;color:var(--muted,#667)}
+.whys ul{margin:0;padding:0;list-style:none;display:grid;gap:6px}.whys li{font-size:.92rem;line-height:1.45;padding:6px 10px;border-left:3px solid var(--line);border-radius:4px}
+.whys li.ok{border-left-color:var(--ok)}.whys li.pk{border-left-color:var(--bad);background:rgba(200,60,60,.07)}.whys li b{margin-right:4px}
 .madde{font-family:var(--f-mono);font-size:.78rem;border:1px solid var(--ink);border-radius:4px;padding:2px 7px}
 .vb{font-size:.68rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:3px 8px;border-radius:4px}
 .vb.R{background:var(--ok-soft);color:var(--ok)} .vb.E{background:var(--accent-soft);color:var(--accent)}
