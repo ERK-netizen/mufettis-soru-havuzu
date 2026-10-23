@@ -88,13 +88,97 @@ function wrongList(){return Q.filter(function(x){var a=S.ans[x.id];return a&&a.r
 function markList(){return Q.filter(function(x){return isMarked(x.id);});}
 function newList(){return Q.filter(function(x){return !S.ans[x.id];});}
 
+/* --- Konu özeti (yanlış cevap dönütü) ---
+   Mevzuat konularında: sorunun dayanak maddesi resmî metinden birebir (OZET, tools/ozet_cikar.py üretir).
+   Rehber konularında: aynı başlıktaki diğer soruların açıklamaları (+ Öğrenme Psikolojisi'nde ünite "kritik bilgiler"). Yeni bilgi uydurulmaz. */
+var PEER=null,UNITS=null,OZC={};
+function tokSet(x){
+  if(x._t)return x._t;var t={};
+  (x.q.replace(/<br>/g," ")+" "+x.o[x.a]+" "+x.e).toLowerCase().replace(/i̇/g,"i").replace(/[a-zçğıöşü]{5,}/g,function(w){t[w.slice(0,5)]=1;return w;});
+  x._t=t;return t;
+}
+function unitKey(d){
+  var m=/Ü(\d+)|Ünite (\d+)/.exec(d);if(m)return "Ü"+(m[1]||m[2]);
+  m=/Bölüm (\d+)|Ders notu (\d+)|Tablo (\d+)/.exec(d);if(m)return "B"+(m[1]||m[2]||m[3]);
+  return null;
+}
+function ozRelevant(x,pool,min){
+  var tx=tokSet(x),seen={},out=[];
+  pool.forEach(function(y){
+    if(y===x||!y.e||seen[y.e])return;seen[y.e]=1;
+    var ty=tokSet(y),sc=0;for(var k in ty)if(tx[k])sc++;
+    if(sc>=min)out.push({e:y.e,sc:sc});
+  });
+  out.sort(function(a,b){return b.sc-a.sc;});
+  return out.slice(0,5).map(function(o){return o.e;});
+}
+/* aynı başlıktaki ve (yetmezse) aynı ünitedeki sorulardan, bu soruyla en çok ilgili açıklamalar */
+function ozPeers(x){
+  if(OZC[x.id])return OZC[x.id];
+  if(!PEER){PEER={};UNITS={};Q.forEach(function(y){var k=y.k+"|"+y.d;(PEER[k]=PEER[k]||[]).push(y);var u=unitKey(y.d);if(u)(UNITS[y.k+"|"+u]=UNITS[y.k+"|"+u]||[]).push(y);});}
+  var exact=ozRelevant(x,PEER[x.k+"|"+x.d]||[],2),unit=[];
+  if(exact.length<3){var u=unitKey(x.d);if(u)unit=ozRelevant(x,UNITS[x.k+"|"+u]||[],3).filter(function(e){return exact.indexOf(e)<0;}).slice(0,5-exact.length);}
+  return OZC[x.id]={exact:exact,unit:unit};
+}
+function ozKey(x){return x.k+"|"+x.d;}
+function ozMevzuat(x){
+  if(typeof OZET==="undefined"||!OZET.r)return null;
+  var ks=OZET.r[ozKey(x)];if(!ks)return null;
+  var out=ks.map(function(sk){
+    var S=OZET.s[sk],p=sk.split("#"),M=OZET.m[p[0]+"#"+p[1]];if(!S||!M)return null;
+    var ix=S.i||M.p.map(function(_,i){return i;}),hl={};(S.h||[]).forEach(function(i){hl[i]=1;});
+    return {a:S.a,t:M.t,ix:ix,hl:hl,all:M.p,f:S.i?M.p:null,c:M.c};
+  }).filter(Boolean);
+  return out.length?out:null;
+}
+function ozUnit(x){
+  if(typeof OZET==="undefined"||!OZET.u||x.s!=="pOgr")return null;
+  var m=/Ü(\d+)|Ünite (\d+)/.exec(x.d);if(!m)return null;
+  return OZET.u[m[1]||m[2]]||null;
+}
+function ozHas(x){if(ozMevzuat(x)||ozUnit(x))return true;var p=ozPeers(x);return p.exact.length+p.unit.length>0;}
+function ozParas(a,ix,hl){return (ix||a.map(function(_,i){return i;})).map(function(i){return "<p"+(hl&&hl[i]?" class=\"hl\"":"")+">"+esc(a[i])+"</p>";}).join("");}
+function ozBody(x){
+  var m=ozMevzuat(x),h="";
+  if(m){
+    m.forEach(function(o){
+      h+="<div class=\"oz\"><div class=\"oz-h\"><span class=\"madde\">"+esc(o.a)+"</span>"+(o.t?"<b>"+esc(o.t)+"</b>":"")+"</div>"+ozParas(o.all,o.ix,o.hl)+(o.c&&!o.f?"<p class=\"lead\">Madde çok uzun olduğundan metin kısaltılmıştır.</p>":"")
+        +(o.f?"<details class=\"oz-more\"><summary>Maddenin tamamı</summary>"+ozParas(o.f,null,o.hl)+(o.c?"<p class=\"lead\">Madde çok uzun olduğundan metin kısaltılmıştır.</p>":"")+"</details>":"")+"</div>";
+    });
+    return h+"<p class=\"oz-note\">Resmî metinden birebir alınmıştır; değişiklik künyeleri çıkarılmıştır.</p>";
+  }
+  h+="<div class=\"oz\"><div class=\"oz-h\"><span class=\"madde\">"+esc(x.d)+"</span></div>";
+  var u=ozUnit(x);
+  if(u){
+    if(u.k&&u.k.length)h+="<p class=\"oz-sub\">Kritik bilgiler</p><ul>"+u.k.map(function(t){return "<li>"+esc(t)+"</li>";}).join("")+"</ul>";
+    if(u.y&&u.y.length)h+="<p class=\"oz-sub\">Sık yapılan yanlışlar</p><ul>"+u.y.map(function(t){return "<li>"+esc(t)+"</li>";}).join("")+"</ul>";
+  }
+  var pe=ozPeers(x);
+  if(pe.exact.length)h+="<p class=\"oz-sub\">Aynı başlıktaki ilgili açıklamalar</p><ul>"+pe.exact.map(function(t){return "<li>"+esc(t)+"</li>";}).join("")+"</ul>";
+  if(pe.unit.length)h+="<p class=\"oz-sub\">Aynı ünitedeki ilgili açıklamalar</p><ul>"+pe.unit.map(function(t){return "<li>"+esc(t)+"</li>";}).join("")+"</ul>";
+  return h+"</div>"+(u?"<p class=\"oz-note\">Ünite notları ilgili rehberden birebir alınmıştır.</p>":"");
+}
+function ozTitle(x){return ozMevzuat(x)?"Konu özeti · ilgili madde":"Konu özeti · kavram notu";}
+/* Yanlış cevaplanan sorulardan benzersiz konu özetleri (aynı dayanak bir kez) */
+function ozGroups(list){
+  var map={},order=[];
+  list.forEach(function(x){
+    if(!ozHas(x))return;
+    var m=ozMevzuat(x),key=m?m.map(function(o){return o.a;}).join("+"):ozKey(x);
+    if(!map[key]){map[key]={x:x,n:0,key:key};order.push(key);}
+    map[key].n++;
+  });
+  return order.map(function(k){return map[k];}).sort(function(a,b){return b.n-a.n;});
+}
+
 /* --- yönlendirme --- */
 var view=document.getElementById("view"), ttl=document.getElementById("ttl"), backBtn=document.getElementById("back");
 var route={tab:"study",screen:"home"};
-var ui={sec:"all",filter:"all",order:"seq",examN:40,confirmReset:false,result:null};
+var ui={sec:"all",filter:"all",order:"seq",examN:40,confirmReset:false,result:null,ozetFrom:"review",ozetN:25};
 var tabs=[].slice.call(document.querySelectorAll(".tabbar button"));
 tabs.forEach(function(b){b.onclick=function(){go(b.getAttribute("data-tab"),"home");};});
 backBtn.onclick=function(){
+  if(route.screen==="ozet"&&ui.ozetFrom==="result"&&ui.result){route.screen="result";refresh();view.scrollTop=0;return;}
   if(route.screen==="play"&&SES&&SES.kind==="exam"&&!SES.done){go("exam","home");return;}
   go(route.tab,"home");
 };
@@ -106,6 +190,7 @@ function refresh(){
   var h="";
   if(route.screen==="play")h=renderPlay();
   else if(route.screen==="result")h=renderResult();
+  else if(route.screen==="ozet")h=renderOzet();
   else if(route.tab==="study")h=renderStudy();
   else if(route.tab==="exam")h=renderExam();
   else if(route.tab==="review")h=renderReview();
@@ -187,6 +272,7 @@ function renderPlay(){
     h+="<div class=\"explain\"><div class=\"verdict "+(ok?"ok":"no")+"\">"+(ok?"Doğru.":"Yanlış. Doğru cevap "+LET[ord.indexOf(x.a)]+".")+"</div><p>"+esc(x.e)+"</p>"
       +"<div class=\"ref\"><span class=\"madde\">"+esc(x.d)+"</span><span class=\"vb "+s.v+"\">"+VLAB[s.v]+"</span></div>"
       +"<div class=\"src\">Kaynak: "+(s.u?"<a href=\""+esc(s.u)+"\" target=\"_blank\" rel=\"noopener\">"+esc(s.t)+"</a>":esc(s.t))+"</div>";
+    if(!ok&&ozHas(x))h+="<details class=\"ozet\" open><summary>"+ozTitle(x)+"</summary>"+ozBody(x)+"</details>";
     if(SAMPLE){
       var as=askState[x.id];
       h+="<div class=\"ask\">";
@@ -240,9 +326,30 @@ function renderResult(){
   if(r.wrong.length){
     h+="<div class=\"group\"><h3>Yanlış cevaplanan sorular</h3><ul class=\"wrongs\">";
     r.wrong.slice(0,40).forEach(function(id){var x=BYID[id];h+="<li><span>"+qhtml(x.q)+"</span><span class=\"ans\">"+esc(x.o[x.a])+"</span><span class=\"src\">"+esc(x.d)+"</span></li>";});
-    h+="</ul><button class=\"btn primary block\" data-act=\"redoWrong\">Bu yanlışları tekrar çöz</button></div>";
+    var rw=r.wrong.map(function(id){return BYID[id];}),ng=ozGroups(rw).length;
+    h+="</ul><button class=\"btn primary block\" data-act=\"redoWrong\">Bu yanlışları tekrar çöz</button>"
+      +(ng?"<button class=\"btn block\" data-act=\"ozetResult\">Yanlışların konu özeti ("+ng+")</button>":"")+"</div>";
   }
   h+="<button class=\"btn block\" data-act=\"home\">Tamam</button>";
+  return h;
+}
+
+/* --- Konu özetleri ekranı (yanlışlardan) --- */
+function ozetList(){
+  if(ui.ozetFrom==="result"&&ui.result)return ui.result.wrong.map(function(id){return BYID[id];});
+  return wrongList();
+}
+function renderOzet(){
+  var fromRes=ui.ozetFrom==="result"&&ui.result;
+  ttl.textContent="Konu özetleri";
+  var g=ozGroups(ozetList());
+  if(!g.length)return "<p class=\"empty\">Konu özeti gösterilecek yanlış soru yok.</p>";
+  var h="<p class=\"lead\">"+(fromRes?"Bu oturumda":"Şu an")+" yanlış olan sorular dayanak maddelerine ve kavramlarına göre toplandı; en çok yanlış yaptığın konu en üstte. Madde metinleri resmî metinden birebir alınmıştır.</p>";
+  g.slice(0,ui.ozetN).forEach(function(o){
+    var x=o.x;
+    h+="<article class=\"card ozcard\"><div class=\"qmeta\"><span>"+esc(SEC_SHORT[x.b])+"</span><span>"+esc(x.k)+"</span><span class=\"flag\">"+o.n+" yanlış soru</span></div>"+ozBody(x)+"</article>";
+  });
+  if(g.length>ui.ozetN)h+="<button class=\"btn block\" data-act=\"ozetMore\">Daha fazla göster ("+(g.length-ui.ozetN)+")</button>";
   return h;
 }
 
@@ -284,6 +391,8 @@ function renderReview(){
     +"<button class=\"tile bad\" data-act=\"revWrong\""+(w.length?"":" disabled")+"><span class=\"big\">"+w.length+"</span><span class=\"lab\">Yanlışlarım</span><span class=\"sub\">Karışık sırayla tekrar</span></button>"
     +"<button class=\"tile mark\" data-act=\"revMark\""+(m.length?"":" disabled")+"><span class=\"big\">"+m.length+"</span><span class=\"lab\">İşaretlediklerim</span><span class=\"sub\">Kitap simgesiyle işaretlenenler</span></button>"
     +"<button class=\"tile new\" data-act=\"revNew\""+(nw.length?"":" disabled")+"><span class=\"big\">"+nw.length+"</span><span class=\"lab\">Hiç çözmediklerim</span><span class=\"sub\">Rastgele 20 soru</span></button></div>";
+  var og=ozGroups(w).length;
+  h+="<button class=\"btn block\" data-act=\"ozetAll\""+(og?"":" disabled")+">Yanlışlarımın konu özetleri"+(og?" ("+og+")":"")+"</button>";
   var wk=weakKonu();
   h+="<div class=\"group\"><h3>Zayıf konular</h3>";
   if(wk.length){h+="<div class=\"list\">";wk.forEach(function(o){h+="<button class=\"row\" data-weak=\""+esc(o.b+"|"+o.k)+"\"><span class=\"t\">"+esc(o.k)+"</span><span class=\"n\">%"+Math.round(o.acc*100)+"</span>"+meter(o.st)+"<span class=\"s\">"+o.st.seen+" soruda "+o.st.ok+" doğru</span></button>";});h+="</div>";}
@@ -367,6 +476,9 @@ function act(a,el){
   else if(a==="mark"){var x=curQ();S.mark[x.id]=isMarked(x.id)?-now():now();save();refresh();}
   else if(a==="home"){ui.result=null;SES=null;saveSes();go(route.tab,"home");}
   else if(a==="redoWrong"){var r=ui.result;ui.result=null;startSession("review","Oturum yanlışları",r.wrong.map(function(id){return BYID[id];}),{shuffle:true});}
+  else if(a==="ozetAll"){ui.ozetFrom="review";ui.ozetN=25;route.tab="review";route.screen="ozet";refresh();view.scrollTop=0;}
+  else if(a==="ozetResult"){ui.ozetFrom="result";ui.ozetN=25;route.screen="ozet";refresh();view.scrollTop=0;}
+  else if(a==="ozetMore"){ui.ozetN+=25;refresh();}
   else if(a==="revWrong")startSession("review","Yanlışlarım",wrongList(),{shuffle:true});
   else if(a==="revMark")startSession("review","İşaretlediklerim",markList(),{shuffle:false});
   else if(a==="revNew")startSession("review","Yeni sorular",shuffle(newList()).slice(0,20),{shuffle:false});

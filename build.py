@@ -4,10 +4,11 @@ import os,re,json,datetime
 B=os.path.dirname(os.path.abspath(__file__))
 rd=lambda p:open(os.path.join(B,'src',p),encoding='utf-8').read()
 head,kap,data,app=rd('head.html'),rd('kapsam.html'),rd('data.js'),rd('app.js')
+ozet=rd('ozet.js') if os.path.exists(os.path.join(B,'src','ozet.js')) else ''
 n=len(re.findall(r'^\{b:"',data,re.M))
 stamp=datetime.datetime.now().strftime('%d.%m.%Y %H:%M')
 body=head.replace('%%KAPSAM%%',kap)
-mk=lambda web:'\n<script>\nvar BUILD_INFO='+json.dumps({'tarih':stamp,'soru':n,'web':web},ensure_ascii=False)+';\n'+data+'\n'+app+'\n</script>\n'
+mk=lambda web:'\n<script>\nvar BUILD_INFO='+json.dumps({'tarih':stamp,'soru':n,'web':web},ensure_ascii=False)+';\n'+data+'\n'+ozet+'\n'+app+'\n</script>\n'
 os.makedirs(os.path.join(B,'dist'),exist_ok=True)
 open(os.path.join(B,'dist','artifact.html'),'w',encoding='utf-8').write(body+mk(False))
 pwa_head=('<!doctype html>\n<html lang="tr">\n<meta charset="utf-8">\n'
